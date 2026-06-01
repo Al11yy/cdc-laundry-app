@@ -1,42 +1,44 @@
-import React from 'react';
-import { Tabs } from 'expo-router';
-import { StyleSheet, View, useColorScheme } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Tabs } from 'expo-router';
+import React from 'react';
+import { StyleSheet, View } from 'react-native';
 
 export default function TabsLayout() {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
-
   const themeColors = {
-    tabBarBg: isDark ? 'rgba(23, 23, 23, 0.95)' : 'rgba(255, 255, 255, 0.95)',
-    borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
-    inactiveTint: isDark ? '#737373' : '#a3a3a3',
+    tabBarBg: '#ffffff',       // Latar belakang tab bar putih bersih
+    inactiveTint: '#94a3b8',   // Slate gray saat tidak aktif
+    activeTint: '#2196D3',     // Brand blue saat aktif
   };
 
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#2196D3', // Brand Blue
+        tabBarActiveTintColor: themeColors.activeTint,
         tabBarInactiveTintColor: themeColors.inactiveTint,
+        tabBarShowLabel: true,
         tabBarStyle: [
           styles.tabBar,
           {
             backgroundColor: themeColors.tabBarBg,
-            borderColor: themeColors.borderColor,
+            borderColor: 'transparent',
           }
         ],
         tabBarLabelStyle: styles.tabBarLabel,
+        tabBarItemStyle: styles.tabBarItem,
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
           title: 'Cucian Saya',
-          tabBarIcon: ({ color, size, focused }) => (
+          tabBarIcon: ({ color }) => (
             <View style={styles.iconWrapper}>
-              <MaterialCommunityIcons name="washing-machine" color={color} size={focused ? size + 2 : size} />
-              {focused && <View style={styles.activeDot} />}
+              <MaterialCommunityIcons 
+                name="washing-machine" 
+                color={color} 
+                size={22} 
+              />
             </View>
           ),
         }}
@@ -45,10 +47,13 @@ export default function TabsLayout() {
         name="history"
         options={{
           title: 'Riwayat',
-          tabBarIcon: ({ color, size, focused }) => (
+          tabBarIcon: ({ color }) => (
             <View style={styles.iconWrapper}>
-              <MaterialCommunityIcons name="history" color={color} size={focused ? size + 2 : size} />
-              {focused && <View style={styles.activeDot} />}
+              <MaterialCommunityIcons 
+                name="history" 
+                color={color} 
+                size={22} 
+              />
             </View>
           ),
         }}
@@ -57,10 +62,13 @@ export default function TabsLayout() {
         name="profile"
         options={{
           title: 'Profil',
-          tabBarIcon: ({ color, size, focused }) => (
+          tabBarIcon: ({ color, focused }) => (
             <View style={styles.iconWrapper}>
-              <MaterialCommunityIcons name="account" color={color} size={focused ? size + 2 : size} />
-              {focused && <View style={styles.activeDot} />}
+              <MaterialCommunityIcons 
+                name={focused ? "account" : "account-outline"} 
+                color={color} 
+                size={22} 
+              />
             </View>
           ),
         }}
@@ -72,34 +80,33 @@ export default function TabsLayout() {
 const styles = StyleSheet.create({
   tabBar: {
     position: 'absolute',
+    marginHorizontal: 16,
     bottom: 24,
-    left: 20,
-    right: 20,
-    height: 72,
-    borderRadius: 36,
+    height: 66,
+    borderRadius: 28,
+    paddingBottom: 0,
     borderWidth: 1,
-    elevation: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.2,
-    shadowRadius: 15,
-    paddingBottom: 10,
-    paddingTop: 8,
+    borderColor: 'rgba(33, 150, 211, 0.08)',
+    shadowColor: '#2196D3',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 4,
+  },
+  tabBarItem: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: 6,
   },
   tabBarLabel: {
     fontFamily: 'Poppins_600Medium',
     fontSize: 10,
     marginTop: 2,
+    letterSpacing: 0.1,
   },
   iconWrapper: {
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  activeDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#7EC839', // Brand Green
-    marginTop: 4,
+    height: 24,
   },
 });

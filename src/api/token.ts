@@ -6,7 +6,7 @@ export async function setToken(token: string) {
   memoryToken = token;
   try {
     await SecureStore.setItemAsync('auth_token', token);
-  } catch (e) {
+  } catch {
     console.warn('SecureStore not available, falling back to memory store.');
   }
 }
@@ -19,7 +19,7 @@ export async function getToken() {
       memoryToken = token;
       return token;
     }
-  } catch (e) {
+  } catch {
     // fallback to memory
   }
   return memoryToken;
@@ -29,7 +29,7 @@ export async function removeToken() {
   memoryToken = null;
   try {
     await SecureStore.deleteItemAsync('auth_token');
-  } catch (e) {
+  } catch {
     console.warn('SecureStore not available for delete.');
   }
 }
