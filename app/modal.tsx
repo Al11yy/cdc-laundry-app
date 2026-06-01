@@ -227,11 +227,19 @@ export default function OrderTrackingModal() {
         <View style={styles.overviewGlassCard}>
           <View style={styles.cardHeaderRow}>
             <View style={styles.headerMeta}>
-              <View style={[styles.iconBox, { backgroundColor: color + '15' }]}>
-                <MaterialCommunityIcons name="tshirt-crew-outline" color={color} size={22} />
+              <View style={[styles.iconBox, { backgroundColor: color + '15', overflow: 'hidden' }]}>
+                {order.service?.service_photo ? (
+                  <Image 
+                    source={{ uri: getStorageURL(order.service.service_photo) }} 
+                    style={{ width: '100%', height: '100%' }} 
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <MaterialCommunityIcons name="tshirt-crew-outline" color={color} size={22} />
+                )}
               </View>
-              <View>
-                <Text style={styles.cardServiceTitle}>{order.service?.service_name || 'Paket Laundry'}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.cardServiceTitle} numberOfLines={1}>{order.service?.service_name || 'Paket Laundry'}</Text>
                 <Text style={styles.cardInvoiceCode}>{order.invoice_code}</Text>
               </View>
             </View>
@@ -412,7 +420,7 @@ export default function OrderTrackingModal() {
             <Text style={styles.financeValueText}>{order.payment_method?.toUpperCase() || 'CASH'}</Text>
           </View>
 
-          <View style={[styles.financeRow, { borderBottomWidth: order.payment_proof ? 1 : 0, paddingBottom: order.payment_proof ? 10 : 0, marginBottom: order.payment_proof ? 10 : 0 }]}>
+          <View style={[styles.financeRow, { borderBottomWidth: order.clothes_photo ? 1 : 0, paddingBottom: order.clothes_photo ? 10 : 0, marginBottom: order.clothes_photo ? 10 : 0 }]}>
             <Text style={styles.financeLabel}>Validasi Kuitansi</Text>
             <View style={[styles.payBadge, { backgroundColor: isPaid ? 'rgba(126, 200, 57, 0.1)' : 'rgba(244, 63, 94, 0.1)', borderColor: isPaid ? '#7EC839' : '#f43f5e' }]}>
               <Text style={[styles.payBadgeText, { color: isPaid ? '#7EC839' : '#f43f5e' }]}>
@@ -422,7 +430,7 @@ export default function OrderTrackingModal() {
           </View>
 
           {/* Bukti Transfer Image Section */}
-          {order.payment_proof ? (
+          {order.clothes_photo ? (
             <View style={styles.paymentProofContainer}>
               <Text style={styles.paymentProofTitle}>Bukti Transfer / Pembayaran:</Text>
               <TouchableOpacity 
@@ -431,7 +439,7 @@ export default function OrderTrackingModal() {
                 activeOpacity={0.8}
               >
                 <Image 
-                  source={{ uri: getStorageURL(order.payment_proof) }} 
+                  source={{ uri: getStorageURL(order.clothes_photo) }} 
                   style={styles.paymentProofImage} 
                   resizeMode="cover"
                 />
@@ -467,9 +475,9 @@ export default function OrderTrackingModal() {
           >
             <MaterialCommunityIcons name="close" color="#ffffff" size={24} />
           </TouchableOpacity>
-          {order.payment_proof && (
+          {order.clothes_photo && (
             <Image 
-              source={{ uri: getStorageURL(order.payment_proof) }} 
+              source={{ uri: getStorageURL(order.clothes_photo) }} 
               style={styles.fullscreenImage} 
               resizeMode="contain"
             />
@@ -481,14 +489,14 @@ export default function OrderTrackingModal() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f3f8fc', paddingHorizontal: 22 },
-  centerContainer: { flex: 1, backgroundColor: '#f3f8fc', justifyContent: 'center', alignItems: 'center' },
+  container: { flex: 1, backgroundColor: '#f4f6fa', paddingHorizontal: 22 },
+  centerContainer: { flex: 1, backgroundColor: '#f4f6fa', justifyContent: 'center', alignItems: 'center' },
   scrollContent: { paddingTop: 12, paddingBottom: 40 },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 54, marginBottom: 20 },
   headerTitleText: { fontFamily: 'Poppins_700Bold', fontSize: 15, color: '#1e293b', letterSpacing: 0.3 },
-  backButton: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#ffffff', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(33, 150, 211, 0.12)', shadowColor: '#2196D3', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 },
+  backButton: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#ffffff', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0' },
   errorText: { fontFamily: 'Poppins_500Medium', color: '#f43f5e', fontSize: 13 },
-  overviewGlassCard: { backgroundColor: '#ffffff', borderRadius: 24, padding: 18, borderWidth: 1, borderColor: 'rgba(33, 150, 211, 0.1)', marginBottom: 16, shadowColor: '#2196D3', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.03, shadowRadius: 10, elevation: 2 },
+  overviewGlassCard: { backgroundColor: '#ffffff', borderRadius: 24, padding: 18, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 16 },
   cardHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   headerMeta: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
   iconBox: { width: 44, height: 44, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
@@ -501,7 +509,7 @@ const styles = StyleSheet.create({
   gridDivider: { width: 1, height: 24, backgroundColor: 'rgba(0,0,0,0.04)', marginHorizontal: 12 },
   cardStatusFooterRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingTop: 2 },
   cardStatusFooterText: { fontFamily: 'Poppins_500Medium', fontSize: 10, color: '#64748b', flex: 1 },
-  timelineSectionCard: { backgroundColor: '#ffffff', borderRadius: 24, padding: 20, borderWidth: 1, borderColor: 'rgba(33, 150, 211, 0.1)', marginBottom: 16, shadowColor: '#2196D3', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.03, shadowRadius: 10, elevation: 2 },
+  timelineSectionCard: { backgroundColor: '#ffffff', borderRadius: 24, padding: 20, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 16 },
   sectionTitle: { fontFamily: 'Poppins_700Bold', fontSize: 14, color: '#1e293b', marginBottom: 20, letterSpacing: 0.2 },
   timelineStepRow: { flexDirection: 'row', marginBottom: 4, minHeight: 60 },
   leftTimelineIndicatorBlock: { alignItems: 'center', marginRight: 14, width: 24 },
@@ -510,7 +518,7 @@ const styles = StyleSheet.create({
   rightStepDetailsBlock: { flex: 1, paddingTop: 1 },
   stepLabelText: { fontFamily: 'Poppins_700Bold', fontSize: 13, color: '#94a3b8' },
   stepDescText: { fontFamily: 'Poppins_500Medium', fontSize: 10, color: '#64748b', marginTop: 2, lineHeight: 14 },
-  financeCard: { backgroundColor: '#ffffff', borderRadius: 24, padding: 18, borderWidth: 1, borderColor: 'rgba(33, 150, 211, 0.1)', shadowColor: '#2196D3', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.03, shadowRadius: 10, elevation: 2 },
+  financeCard: { backgroundColor: '#ffffff', borderRadius: 24, padding: 18, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 16 },
   financeTitle: { fontFamily: 'Poppins_700Bold', fontSize: 13, color: '#1e293b', marginBottom: 14 },
   financeRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.04)', marginBottom: 10 },
   financeLabel: { fontFamily: 'Poppins_500Medium', fontSize: 11, color: '#64748b' },
@@ -519,7 +527,7 @@ const styles = StyleSheet.create({
   payBadgeText: { fontFamily: 'Poppins_700Bold', fontSize: 9, letterSpacing: 0.3 },
   
   // New Styles
-  receiptSectionCard: { backgroundColor: '#ffffff', borderRadius: 24, padding: 20, borderWidth: 1, borderColor: 'rgba(33, 150, 211, 0.1)', marginBottom: 16, shadowColor: '#2196D3', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.03, shadowRadius: 10, elevation: 2 },
+  receiptSectionCard: { backgroundColor: '#ffffff', borderRadius: 24, padding: 20, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 16 },
   receiptHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   printActionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(33, 150, 211, 0.08)', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 10 },
   printActionText: { fontFamily: 'Poppins_700Bold', fontSize: 11, color: '#2196D3' },

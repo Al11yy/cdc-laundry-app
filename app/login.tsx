@@ -29,7 +29,7 @@ export default function LoginCustomer() {
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Peringatan', 'Email dan password wajib diisi, cui!');
+      Alert.alert('Peringatan', 'Email dan kata sandi wajib diisi.');
       return;
     }
 
@@ -221,11 +221,6 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#ffffff',
     marginBottom: 14,
-    shadowColor: '#94a3b8',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 2,
   },
   logoImage: {
     width: '100%',
@@ -250,11 +245,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingVertical: 28,
     paddingHorizontal: 20,
-    shadowColor: '#94a3b8',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
-    shadowRadius: 15,
-    elevation: 4,
   },
   label: {
     fontFamily: 'Poppins_700Bold',

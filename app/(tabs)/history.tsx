@@ -7,6 +7,7 @@ import {
   FlatList,
   Modal,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -24,10 +25,11 @@ const PERIOD_FILTERS = [
   { key: 'Hari Ini', label: 'Hari Ini' },
   { key: 'Minggu Ini', label: 'Minggu Ini' },
   { key: 'Bulan Ini', label: 'Bulan Ini' },
-  { key: 'Sepanjang Masa', label: 'Sepanjang Masa' }
+  { key: 'Sepanjang Masa', label: 'Sepanjang Masa' },
+  { key: 'Pilih Tanggal', label: 'Pilih Rentang Tanggal...' }
 ];
 
-const PAYMENT_STATUSES = ['Semua', 'Lunas', 'Belum Bayar'];
+const LAUNDRY_STATUSES = ['Semua', 'Antrian', 'Dicuci', 'Disetrika', 'Siap Diambil', 'Diambil'];
 
 export default function HistoryScreen() {
   const [allOrders, setAllOrders] = useState<any[]>([]);
@@ -36,13 +38,22 @@ export default function HistoryScreen() {
   const [completedOrdersCount, setCompletedOrdersCount] = useState(0);
   const [totalExpenditure, setTotalExpenditure] = useState(0);
   const [selectedPeriod, setSelectedPeriod] = useState('Sepanjang Masa');
-  const [selectedPaymentStatus, setSelectedPaymentStatus] = useState('Semua');
+  const [selectedLaundryStatus, setSelectedLaundryStatus] = useState('Semua');
+  const [selectedServiceType, setSelectedServiceType] = useState('Semua');
   const [searchQuery, setSearchQuery] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   
+  // Custom date selection state
+  const [startDate, setStartDate] = useState<Date | null>(null);
+  const [endDate, setEndDate] = useState<Date | null>(null);
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [currentCalendarMonth, setCurrentCalendarMonth] = useState(new Date());
+
   const router = useRouter();
+
+  const dynamicServiceTypes = ['Semua', ...Array.from(new Set(allOrders.map(o => o.service?.service_name).filter(Boolean)))];
 
   const getStorageURL = (path: string) => {
     if (!path) return '';
@@ -54,7 +65,15 @@ export default function HistoryScreen() {
     return `http://${ip}:8000/storage/${path}`;
   };
 
-  const applyFilters = (ordersList: any[], period: string, query: string, payStatus: string) => {
+  const applyFilters = (
+    ordersList: any[], 
+    period: string, 
+    query: string, 
+    laundryStatus: string, 
+    serviceType: string,
+    startDt?: Date | null, 
+    endDt?: Date | null
+  ) => {
     const now = new Date();
     let filtered = [...ordersList];
 
@@ -78,16 +97,28 @@ export default function HistoryScreen() {
         const orderDate = new Date(order.created_at);
         return orderDate >= oneMonthAgo;
       });
+    } else if ((period === 'Pilih Tanggal' || period === 'Pilih Rentang Tanggal...') && startDt && endDt) {
+      const start = new Date(startDt);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(endDt);
+      end.setHours(23, 59, 59, 999);
+      filtered = ordersList.filter(order => {
+        const orderDate = new Date(order.created_at);
+        return orderDate >= start && orderDate <= end;
+      });
     }
 
-    // 2. Payment Status Filter
-    if (payStatus === 'Lunas') {
-      filtered = filtered.filter(order => order.payment_status?.toLowerCase() === 'paid');
-    } else if (payStatus === 'Belum Bayar') {
-      filtered = filtered.filter(order => order.payment_status?.toLowerCase() === 'pending');
+    // 2. Laundry Status Filter
+    if (laundryStatus && laundryStatus !== 'Semua') {
+      filtered = filtered.filter(order => order.status?.toLowerCase() === laundryStatus.toLowerCase());
     }
 
-    // 3. Search Query Filter
+    // 3. Service Type Filter
+    if (serviceType && serviceType !== 'Semua') {
+      filtered = filtered.filter(order => order.service?.service_name?.toLowerCase() === serviceType.toLowerCase());
+    }
+
+    // 4. Search Query Filter
     if (query.trim() !== '') {
       filtered = filtered.filter(order => 
         order.invoice_code?.toLowerCase().includes(query.toLowerCase()) ||
@@ -107,7 +138,7 @@ export default function HistoryScreen() {
       const response = await apiClient.get('/status-laundry');
       const data = response.data?.data || response.data || [];
       setAllOrders(data);
-      applyFilters(data, selectedPeriod, searchQuery, selectedPaymentStatus);
+      applyFilters(data, selectedPeriod, searchQuery, selectedLaundryStatus, selectedServiceType, startDate, endDate);
 
       const active = data.filter((trx: any) => trx.status.toLowerCase() !== 'diambil');
       const completed = data.filter((trx: any) => trx.status.toLowerCase() === 'diambil');
@@ -136,6 +167,7 @@ export default function HistoryScreen() {
       }
     };
     checkAuth();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const onRefresh = () => {
@@ -144,19 +176,47 @@ export default function HistoryScreen() {
   };
 
   const handlePeriodSelect = (periodLabel: string) => {
-    setSelectedPeriod(periodLabel);
     setIsDropdownOpen(false);
-    applyFilters(allOrders, periodLabel, searchQuery, selectedPaymentStatus);
+    if (periodLabel === 'Pilih Rentang Tanggal...') {
+      setIsCalendarOpen(true);
+    } else {
+      setSelectedPeriod(periodLabel);
+      setStartDate(null);
+      setEndDate(null);
+      applyFilters(allOrders, periodLabel, searchQuery, selectedLaundryStatus, selectedServiceType, null, null);
+    }
   };
 
   const handleSearchChange = (text: string) => {
     setSearchQuery(text);
-    applyFilters(allOrders, selectedPeriod, text, selectedPaymentStatus);
+    applyFilters(allOrders, selectedPeriod, text, selectedLaundryStatus, selectedServiceType, startDate, endDate);
   };
 
-  const handlePaymentStatusSelect = (status: string) => {
-    setSelectedPaymentStatus(status);
-    applyFilters(allOrders, selectedPeriod, searchQuery, status);
+  const handleLaundryStatusSelect = (status: string) => {
+    setSelectedLaundryStatus(status);
+    applyFilters(allOrders, selectedPeriod, searchQuery, status, selectedServiceType, startDate, endDate);
+  };
+
+  const handleServiceTypeSelect = (serviceType: string) => {
+    setSelectedServiceType(serviceType);
+    applyFilters(allOrders, selectedPeriod, searchQuery, selectedLaundryStatus, serviceType, startDate, endDate);
+  };
+
+  const getDaysInMonth = (date: Date) => {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const dayOfWeek = (firstDay.getDay() + 6) % 7; // Monday is 0
+    const totalDays = new Date(year, month + 1, 0).getDate();
+    
+    const days = [];
+    for (let i = 0; i < dayOfWeek; i++) {
+      days.push(null);
+    }
+    for (let d = 1; d <= totalDays; d++) {
+      days.push(new Date(year, month, d));
+    }
+    return days;
   };
 
 
@@ -184,7 +244,7 @@ export default function HistoryScreen() {
 
   return (
     <LinearGradient
-      colors={['#f7f5ff', '#ffffff']}
+      colors={['#e8eff7', '#f4f7fa']}
       style={styles.container}
     >
       {/* BACKGROUND UNIK: FLOATING SOAP BUBBLES COATING */}
@@ -204,7 +264,11 @@ export default function HistoryScreen() {
             onPress={() => setIsDropdownOpen(true)}
           >
             <MaterialCommunityIcons name="calendar-month-outline" color="#2196D3" size={16} />
-            <Text style={styles.premiumFilterButtonText}>{selectedPeriod}</Text>
+            <Text style={styles.premiumFilterButtonText}>
+              {selectedPeriod === 'Pilih Tanggal' && startDate && endDate 
+                ? `${startDate.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })} - ${endDate.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}`
+                : selectedPeriod}
+            </Text>
             <MaterialCommunityIcons name="chevron-down" color="#64748b" size={14} />
           </TouchableOpacity>
         </View>
@@ -238,28 +302,69 @@ export default function HistoryScreen() {
               )}
             </View>
 
-            {/* 2. PAYMENT STATUS FILTER CHIPS (Fitur 2) */}
-            <View style={styles.paymentFilterContainer}>
-              {PAYMENT_STATUSES.map((status) => {
-                const isSelected = selectedPaymentStatus === status;
-                return (
-                  <TouchableOpacity
-                    key={status}
-                    onPress={() => handlePaymentStatusSelect(status)}
-                    style={[
-                      styles.payStatusChip,
-                      isSelected ? styles.payStatusChipActive : styles.payStatusChipInactive
-                    ]}
-                  >
-                    <Text style={[
-                      styles.payStatusChipText,
-                      isSelected ? styles.payStatusChipTextActive : styles.payStatusChipTextInactive
-                    ]}>
-                      {status}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
+            {/* 2. DUA FILTER TERPISAH (STATUS & JENIS LAYANAN) */}
+            <View style={styles.filtersWrapper}>
+              {/* Seksi Filter Status Cucian */}
+              <View style={styles.filterSectionContainer}>
+                <Text style={styles.filterLabelText}>STATUS CUCIAN</Text>
+                <ScrollView 
+                  horizontal 
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.filterChipsRow}
+                >
+                  {LAUNDRY_STATUSES.map((status) => {
+                    const isSelected = selectedLaundryStatus === status;
+                    return (
+                      <TouchableOpacity
+                        key={status}
+                        onPress={() => handleLaundryStatusSelect(status)}
+                        style={[
+                          styles.filterChip,
+                          isSelected ? styles.filterChipActive : styles.filterChipInactive
+                        ]}
+                      >
+                        <Text style={[
+                          styles.filterChipText,
+                          isSelected ? styles.filterChipTextActive : styles.filterChipTextInactive
+                        ]}>
+                          {status}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+
+              {/* Seksi Filter Jenis Layanan */}
+              <View style={styles.filterSectionContainer}>
+                <Text style={styles.filterLabelText}>JENIS LAYANAN</Text>
+                <ScrollView 
+                  horizontal 
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.filterChipsRow}
+                >
+                  {dynamicServiceTypes.map((serviceName) => {
+                    const isSelected = selectedServiceType === serviceName;
+                    return (
+                      <TouchableOpacity
+                        key={serviceName}
+                        onPress={() => handleServiceTypeSelect(serviceName)}
+                        style={[
+                          styles.filterChip,
+                          isSelected ? styles.filterChipActive : styles.filterChipInactive
+                        ]}
+                      >
+                        <Text style={[
+                          styles.filterChipText,
+                          isSelected ? styles.filterChipTextActive : styles.filterChipTextInactive
+                        ]}>
+                          {serviceName}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
             </View>
 
             {/* 2. STATS HEADER (REDESIGNED FOR PREMIUM LOOK & HIGHLIGHTED EXPENDITURE) */}
@@ -267,7 +372,13 @@ export default function HistoryScreen() {
               {/* Total Expenditure: Large Prominent Full-Width Card */}
               <View style={styles.expenditureCard}>
                 <View style={styles.expenditureLeft}>
-                  <Text style={styles.expenditureLabel}>TOTAL PENGELUARAN ({selectedPeriod.toUpperCase()})</Text>
+                  <Text style={styles.expenditureLabel}>
+                    TOTAL PENGELUARAN (
+                    {selectedPeriod === 'Pilih Tanggal' && startDate && endDate
+                      ? `${startDate.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }).toUpperCase()} - ${endDate.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }).toUpperCase()}`
+                      : selectedPeriod.toUpperCase()}
+                    )
+                  </Text>
                   <Text style={styles.expenditureValue}>
                     Rp {totalExpenditure.toLocaleString('id-ID')}
                   </Text>
@@ -306,7 +417,7 @@ export default function HistoryScreen() {
 
               {/* Counts Row: Two smaller columns */}
               <View style={styles.countsRow}>
-                <View style={[styles.countCardNew, { borderColor: 'rgba(33, 150, 211, 0.15)' }]}>
+                <View style={[styles.countCardNew, { borderColor: '#e2e8f0' }]}>
                   <View style={styles.countCardHeader}>
                     <View style={[styles.countIconBox, { backgroundColor: 'rgba(33, 150, 211, 0.08)' }]}>
                       <MaterialCommunityIcons name="washing-machine" color="#2196D3" size={16} />
@@ -316,7 +427,7 @@ export default function HistoryScreen() {
                   <Text style={styles.countLabelNew}>Cucian Berjalan</Text>
                 </View>
 
-                <View style={[styles.countCardNew, { borderColor: 'rgba(126, 200, 57, 0.15)' }]}>
+                <View style={[styles.countCardNew, { borderColor: '#e2e8f0' }]}>
                   <View style={styles.countCardHeader}>
                     <View style={[styles.countIconBox, { backgroundColor: 'rgba(126, 200, 57, 0.08)' }]}>
                       <MaterialCommunityIcons name="check-circle-outline" color="#7EC839" size={16} />
@@ -397,7 +508,7 @@ export default function HistoryScreen() {
             <TouchableWithoutFeedback>
               <View style={styles.dropdownFloatingMenu}>
                 {PERIOD_FILTERS.map((filter) => {
-                  const isCurrentSelected = selectedPeriod === filter.label;
+                  const isCurrentSelected = selectedPeriod === filter.label || (filter.key === 'Pilih Tanggal' && selectedPeriod === 'Pilih Tanggal');
                   return (
                     <TouchableOpacity
                       key={filter.key}
@@ -417,40 +528,202 @@ export default function HistoryScreen() {
         </TouchableWithoutFeedback>
       </Modal>
 
+      {/* CUSTOM CALENDAR MODAL */}
+      <Modal
+        visible={isCalendarOpen}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setIsCalendarOpen(false)}
+      >
+        <View style={styles.calendarModalBackdrop}>
+          <View style={styles.calendarModalContent}>
+            <View style={styles.calendarHeader}>
+              <Text style={styles.calendarTitle}>Pilih Rentang Tanggal</Text>
+              <TouchableOpacity onPress={() => setIsCalendarOpen(false)}>
+                <MaterialCommunityIcons name="close" color="#475569" size={20} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Month Navigation Row */}
+            <View style={styles.monthNavRow}>
+              <TouchableOpacity 
+                onPress={() => {
+                  const prev = new Date(currentCalendarMonth);
+                  prev.setMonth(prev.getMonth() - 1);
+                  setCurrentCalendarMonth(prev);
+                }}
+                style={styles.navArrow}
+              >
+                <MaterialCommunityIcons name="chevron-left" color="#1e293b" size={20} />
+              </TouchableOpacity>
+              <Text style={styles.monthTextName}>
+                {currentCalendarMonth.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}
+              </Text>
+              <TouchableOpacity 
+                onPress={() => {
+                  const next = new Date(currentCalendarMonth);
+                  next.setMonth(next.getMonth() + 1);
+                  setCurrentCalendarMonth(next);
+                }}
+                style={styles.navArrow}
+              >
+                <MaterialCommunityIcons name="chevron-right" color="#1e293b" size={20} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Days Header */}
+            <View style={styles.daysHeaderGrid}>
+              {['Sn', 'Sl', 'Rb', 'Km', 'Jm', 'Sb', 'Mg'].map((day) => (
+                <Text key={day} style={styles.daysHeaderLabel}>{day}</Text>
+              ))}
+            </View>
+
+            {/* Calendar Grid */}
+            <View style={styles.calendarGrid}>
+              {getDaysInMonth(currentCalendarMonth).map((day, idx) => {
+                if (!day) return <View key={`empty-${idx}`} style={styles.gridDayBox} />;
+                
+                const isStart = startDate ? day.toDateString() === startDate.toDateString() : false;
+                const isEnd = endDate ? day.toDateString() === endDate.toDateString() : false;
+                const isBetween = startDate && endDate && day > startDate && day < endDate;
+                
+                return (
+                  <TouchableOpacity
+                    key={`day-${day.toISOString()}`}
+                    onPress={() => {
+                      if (!startDate || (startDate && endDate)) {
+                        setStartDate(day);
+                        setEndDate(null);
+                      } else {
+                        if (day < startDate) {
+                          setStartDate(day);
+                        } else {
+                          setEndDate(day);
+                        }
+                      }
+                    }}
+                    style={[
+                      styles.gridDayBox,
+                      isStart && styles.gridDayStart,
+                      isEnd && styles.gridDayEnd,
+                      isBetween && styles.gridDayBetween
+                    ]}
+                  >
+                    <Text style={[
+                      styles.dayTextNumber,
+                      (isStart || isEnd) && styles.dayTextNumberSelected,
+                      isBetween && styles.dayTextNumberBetween
+                    ]}>
+                      {day.getDate()}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Date Info Summary */}
+            <View style={styles.rangeInfoContainer}>
+              <Text style={styles.rangeInfoLabel}>Rentang Terpilih:</Text>
+              <Text style={styles.rangeInfoValue}>
+                {startDate ? startDate.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'} 
+                {'  s/d  '}
+                {endDate ? endDate.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Pilih tanggal selesai'}
+              </Text>
+            </View>
+
+            {/* Action Buttons */}
+            <View style={styles.calendarActionsRow}>
+              <TouchableOpacity 
+                style={[styles.calendarActionBtn, styles.calendarBtnCancel]}
+                onPress={() => {
+                  setIsCalendarOpen(false);
+                }}
+              >
+                <Text style={styles.calendarBtnTextCancel}>Batal</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.calendarActionBtn, styles.calendarBtnApply]}
+                disabled={!startDate || !endDate}
+                onPress={() => {
+                  setSelectedPeriod('Pilih Tanggal');
+                  setIsCalendarOpen(false);
+                  applyFilters(allOrders, 'Pilih Tanggal', searchQuery, selectedLaundryStatus, selectedServiceType, startDate, endDate);
+                }}
+              >
+                <Text style={styles.calendarBtnTextApply}>Terapkan</Text>
+              </TouchableOpacity>
+            </View>
+
+          </View>
+        </View>
+      </Modal>
+
     </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f3f8fc', paddingHorizontal: 22 },
+  container: { flex: 1, backgroundColor: '#f4f6fa', paddingHorizontal: 22 },
   bubbleBg1: { position: 'absolute', width: 150, height: 150, borderRadius: 75, backgroundColor: 'rgba(33, 150, 211, 0.04)', top: -30, left: -40 },
   bubbleBg2: { position: 'absolute', width: 200, height: 200, borderRadius: 100, backgroundColor: 'rgba(126, 200, 57, 0.04)', top: 300, right: -60 },
   listContent: { paddingBottom: 110 },
-  centerContainer: { flex: 1, backgroundColor: '#f3f8fc', justifyContent: 'center', alignItems: 'center' },
+  centerContainer: { flex: 1, backgroundColor: '#f4f6fa', justifyContent: 'center', alignItems: 'center' },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 54, marginBottom: 20 },
   headerRightActions: { flexDirection: 'row', alignItems: 'center' },
-  backButton: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#ffffff', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.8)', shadowColor: '#94a3b8', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1 },
-  premiumFilterDropdownButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.8)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.6)', borderRadius: 12, paddingVertical: 6, paddingHorizontal: 12, gap: 6, shadowColor: '#94a3b8', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1 },
+  backButton: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#ffffff', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0' },
+  premiumFilterDropdownButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.8)', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 12, paddingVertical: 6, paddingHorizontal: 12, gap: 6 },
   premiumFilterButtonText: { fontFamily: 'Poppins_600Medium', fontSize: 12, color: '#1e293b' },
   titleText: { fontFamily: 'Poppins_700Bold', fontSize: 26, color: '#1e293b' },
   subtitleText: { fontFamily: 'Poppins_400Regular', fontSize: 11, color: '#64748b', marginBottom: 16, marginTop: 2 },
   
   // Search Bar Style
-  searchBarContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffffff', borderColor: 'rgba(33, 150, 211, 0.1)', borderWidth: 1, borderRadius: 14, height: 42, paddingHorizontal: 12, marginBottom: 12, shadowColor: '#2196D3', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 },
+  searchBarContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffffff', borderColor: '#e2e8f0', borderWidth: 1, borderRadius: 14, height: 42, paddingHorizontal: 12, marginBottom: 12 },
   searchIcon: { marginRight: 6 },
   searchInput: { flex: 1, color: '#1e293b', fontFamily: 'Poppins_500Medium', fontSize: 12, height: '100%' },
   
-  // Payment Status Chips Row
-  paymentFilterContainer: { flexDirection: 'row', gap: 8, marginBottom: 18 },
-  payStatusChip: { paddingVertical: 6, paddingHorizontal: 14, borderRadius: 10, borderWidth: 1 },
-  payStatusChipActive: { backgroundColor: '#2196D3', borderColor: '#2196D3' },
-  payStatusChipInactive: { backgroundColor: '#ffffff', borderColor: 'rgba(33, 150, 211, 0.1)' },
-  payStatusChipText: { fontFamily: 'Poppins_600Medium', fontSize: 11 },
-  payStatusChipTextActive: { color: '#ffffff' },
-  payStatusChipTextInactive: { color: '#64748b' },
+  // Filters Layout
+  filtersWrapper: { gap: 12, marginBottom: 18 },
+  filterSectionContainer: { width: '100%' },
+  filterLabelText: { fontFamily: 'Poppins_700Bold', fontSize: 9.5, color: '#64748b', letterSpacing: 0.6, marginBottom: 6 },
+  filterChipsRow: { gap: 8, paddingRight: 10 },
+  filterChip: { paddingVertical: 6, paddingHorizontal: 14, borderRadius: 10, borderWidth: 1, justifyContent: 'center', alignItems: 'center' },
+  filterChipActive: { backgroundColor: '#2196D3', borderColor: '#2196D3' },
+  filterChipInactive: { backgroundColor: '#ffffff', borderColor: '#e2e8f0' },
+  filterChipText: { fontFamily: 'Poppins_600Medium', fontSize: 11 },
+  filterChipTextActive: { color: '#ffffff' },
+  filterChipTextInactive: { color: '#64748b' },
+
+  // CUSTOM CALENDAR DESIGN SYSTEM
+  calendarModalBackdrop: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.3)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 22 },
+  calendarModalContent: { backgroundColor: '#ffffff', borderRadius: 28, padding: 22, width: '100%', borderWidth: 1, borderColor: '#e2e8f0' },
+  calendarHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#f1f5f9', paddingBottom: 12, marginBottom: 14 },
+  calendarTitle: { fontFamily: 'Poppins_700Bold', fontSize: 15, color: '#1e293b' },
+  monthNavRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  navArrow: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#f8fafc', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0' },
+  monthTextName: { fontFamily: 'Poppins_700Bold', fontSize: 13, color: '#1e293b' },
+  daysHeaderGrid: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+  daysHeaderLabel: { flex: 1, textAlign: 'center', fontFamily: 'Poppins_700Bold', fontSize: 11, color: '#94a3b8' },
+  calendarGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 2 },
+  gridDayBox: { width: '13.5%', height: 38, justifyContent: 'center', alignItems: 'center', borderRadius: 19, marginVertical: 1 },
+  gridDayStart: { backgroundColor: '#2196D3', borderRadius: 19 },
+  gridDayEnd: { backgroundColor: '#2196D3', borderRadius: 19 },
+  gridDayBetween: { backgroundColor: 'rgba(33, 150, 211, 0.08)', borderRadius: 0 },
+  dayTextNumber: { fontFamily: 'Poppins_600Medium', fontSize: 12, color: '#475569' },
+  dayTextNumberSelected: { color: '#ffffff', fontFamily: 'Poppins_700Bold' },
+  dayTextNumberBetween: { color: '#2196D3', fontFamily: 'Poppins_700Bold' },
+  rangeInfoContainer: { marginTop: 18, backgroundColor: '#f8fafc', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#e2e8f0' },
+  rangeInfoLabel: { fontFamily: 'Poppins_700Bold', fontSize: 9, color: '#94a3b8', letterSpacing: 0.5 },
+  rangeInfoValue: { fontFamily: 'Poppins_600Medium', fontSize: 11, color: '#1e293b', marginTop: 3 },
+  calendarActionsRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 10, marginTop: 18 },
+  calendarActionBtn: { flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  calendarBtnCancel: { backgroundColor: '#f1f5f9', borderWidth: 1, borderColor: '#e2e8f0' },
+  calendarBtnApply: { backgroundColor: '#2196D3' },
+  calendarBtnTextCancel: { fontFamily: 'Poppins_700Bold', fontSize: 12, color: '#64748b' },
+  calendarBtnTextApply: { fontFamily: 'Poppins_700Bold', fontSize: 12, color: '#ffffff' },
 
   statsWrapper: { marginBottom: 20 },
-  expenditureCard: { backgroundColor: '#ffffff', borderRadius: 24, borderWidth: 1, borderColor: 'rgba(33, 150, 211, 0.1)', padding: 18, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', shadowColor: '#2196D3', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.04, shadowRadius: 12, elevation: 3, marginBottom: 10 },
+  expenditureCard: { backgroundColor: '#ffffff', borderRadius: 24, borderWidth: 1, borderColor: '#e2e8f0', padding: 18, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   expenditureLeft: { flex: 1 },
   expenditureLabel: { fontFamily: 'Poppins_700Bold', fontSize: 9, color: '#64748b', letterSpacing: 0.8 },
   expenditureValue: { fontFamily: 'Poppins_700Bold', fontSize: 24, color: '#1e293b', marginTop: 4 },
@@ -459,12 +732,12 @@ const styles = StyleSheet.create({
   insightItem: { flexDirection: 'row', alignItems: 'center', gap: 4, flex: 1 },
   insightText: { fontFamily: 'Poppins_600Medium', fontSize: 9, color: '#64748b' },
   countsRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 10 },
-  countCardNew: { flex: 1, backgroundColor: '#ffffff', borderRadius: 20, padding: 14, borderWidth: 1, shadowColor: '#2196D3', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.03, shadowRadius: 8, elevation: 2 },
+  countCardNew: { flex: 1, backgroundColor: '#ffffff', borderRadius: 20, padding: 14, borderWidth: 1 },
   countCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
   countIconBox: { width: 28, height: 28, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
   countNumberNew: { fontFamily: 'Poppins_700Bold', fontSize: 16 },
   countLabelNew: { fontFamily: 'Poppins_600Medium', fontSize: 10, color: '#64748b' },
-  orderGlassCard: { backgroundColor: '#ffffff', borderRadius: 24, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: 'rgba(33, 150, 211, 0.1)', shadowColor: '#2196D3', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.03, shadowRadius: 10, elevation: 2 },
+  orderGlassCard: { backgroundColor: '#ffffff', borderRadius: 24, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#e2e8f0' },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
   serviceMeta: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
   serviceIconBox: { width: 34, height: 34, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },

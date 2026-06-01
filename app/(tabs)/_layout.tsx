@@ -86,12 +86,7 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     paddingBottom: 0,
     borderWidth: 1,
-    borderColor: 'rgba(33, 150, 211, 0.08)',
-    shadowColor: '#2196D3',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    elevation: 4,
+    borderColor: '#e2e8f0',
   },
   tabBarItem: {
     justifyContent: 'center',
